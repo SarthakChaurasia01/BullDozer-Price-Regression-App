@@ -10,7 +10,13 @@ st.title("🚜 Bulldozer Price Prediction App")
 st.write("Enter bulldozer features to predict its auction sale price.")
 
 # Load dataset
-data = pd.read_csv("bulldozer_dataset/TrainAndValid.csv", low_memory=False)
+
+@st.cache_data
+def load_data():
+    return pd.read_csv("TrainAndValid.csv.zip", compression='zip')
+
+df = load_data()
+
 
 # Select features for a simple model
 features = ['YearMade', 'MachineHoursCurrentMeter', 'ProductSize', 'Enclosure']
