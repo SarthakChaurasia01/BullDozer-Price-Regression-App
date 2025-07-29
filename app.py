@@ -10,7 +10,7 @@ def load_model():
 # Load data
 @st.cache_data
 def load_data():
-    return pd.read_csv("TrainAndValid.csv.zip", compression='zip')
+    return pd.read_csv("TrainAndValid.zip", compression='zip')
 
 # Define the feature columns used in the model
 features = ['YearMade', 'MachineHoursCurrentMeter', 'ModelID', 'ProductGroup', 'Enclosure']
