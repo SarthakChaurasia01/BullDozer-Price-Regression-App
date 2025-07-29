@@ -10,12 +10,22 @@ st.title("🚜 Bulldozer Price Prediction App")
 st.write("Enter bulldozer features to predict its auction sale price.")
 
 # Load dataset
+import streamlit as st
+import pandas as pd
+import os
 
 @st.cache_data
 def load_data():
-    return pd.read_csv("TrainAndValid.csv.zip", compression='zip')
+    path = "TrainAndValid.csv.zip"
+    if not os.path.exists(path):
+        st.error(f"❌ File not found: {path}")
+        return pd.DataFrame()  # return empty df to prevent crash
+    return pd.read_csv(path, compression="zip")
 
 df = load_data()
+
+if df.empty:
+    st.stop()
 
 
 # Select features for a simple model
