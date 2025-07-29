@@ -11,8 +11,8 @@ st.title("🚜 Bulldozer Price Prediction (Pre-trained Model)")
 @st.cache_resource
 def load_model_and_features():
     model = joblib.load("bulldozer_model.pkl")
-    features = joblib.load("features.pkl")  # feature list saved from training
-    return model, features
+    feature_columns = joblib.load("feature_columns.pkl")  # ✅ Correct file name
+    return model, feature_columns
 
 model, feature_columns = load_model_and_features()
 
@@ -20,10 +20,7 @@ model, feature_columns = load_model_and_features()
 # 2. Sidebar Inputs
 # ---------------------------
 st.sidebar.header("Enter Bulldozer Details")
-input_data = {}
-
-for col in feature_columns:
-    input_data[col] = st.sidebar.number_input(col, value=0.0)
+input_data = {col: st.sidebar.number_input(col, value=0.0) for col in feature_columns}
 
 # ---------------------------
 # 3. Prediction
