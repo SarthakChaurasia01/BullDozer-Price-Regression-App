@@ -2,35 +2,53 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import requests
+import re
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 
 st.title("🚜 Bulldozer Price Prediction")
 
 # ---------------------------
-# 1. Download CSV from Google Drive
+# 1. Google Drive Link Input
 # ---------------------------
-csv_url = "https://drive.google.com/uc?export=download&id=1Id_p4lhVDanRg8y3jMZdLeTlIWDpzS1a"
+st.sidebar.header("Dataset Settings")
+drive_link = st.sidebar.text_input(
+    "Google Drive CSV Link",
+    value="https://drive.google.com/file/d/1hwVrEAaYGV_aJBMhZ9inV6MX-Am2fM4u/view?usp=drive_link"
+)
+
+# Extract file ID from link
+match = re.search(r"/d/([a-zA-Z0-9_-]+)", drive_link)
+if match:
+    file_id = match.group(1)
+    csv_url = f"https://drive.google.com/uc?export=download&id={file_id}"
+else:
+    st.error("❌ Invalid Google Drive link format.")
+    st.stop()
+
 csv_path = "TrainAndValid.csv"
 
+# ---------------------------
+# 2. Download CSV
+# ---------------------------
 if not st.session_state.get("data_loaded"):
-    st.write("📥 Downloading dataset...")
+    st.write("📥 Downloading dataset from Google Drive...")
     r = requests.get(csv_url)
     with open(csv_path, "wb") as f:
         f.write(r.content)
     st.session_state["data_loaded"] = True
 
-# Check if the file is valid
+# Check if file is valid
 with open(csv_path, "rb") as f:
     content_start = f.read(200)
     if b"<html" in content_start:
-        st.error("❌ The file link is invalid or requires permission. Please fix sharing settings in Google Drive.")
+        st.error("❌ The file link is invalid or private. Set it to 'Anyone with link can view' in Google Drive.")
         st.stop()
 
-st.success("✅ Dataset downloaded!")
+st.success("✅ Dataset downloaded successfully!")
 
 # ---------------------------
-# 2. Load Dataset
+# 3. Load Dataset
 # ---------------------------
 try:
     df = pd.read_csv(csv_path, low_memory=False)
@@ -40,7 +58,7 @@ except pd.errors.ParserError:
 st.write("### Dataset Preview", df.head())
 
 # ---------------------------
-# 3. Train Model (Sample to Speed Up)
+# 4. Train Model (Sample to Speed Up)
 # ---------------------------
 @st.cache_resource
 def train_model(data):
@@ -62,13 +80,13 @@ with st.spinner("⏳ Training model..."):
     model, feature_columns = train_model(df)
 
 # ---------------------------
-# 4. User Input
+# 5. User Input
 # ---------------------------
 st.sidebar.header("Enter Bulldozer Details")
 input_data = {col: st.sidebar.number_input(col, value=0.0) for col in feature_columns}
 
 # ---------------------------
-# 5. Prediction
+# 6. Prediction
 # ---------------------------
 if st.button("Predict Price"):
     input_df = pd.DataFrame([input_data])
