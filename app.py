@@ -1,10 +1,10 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import requests
-import re
+import gdown
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
+import re
 
 st.title("🚜 Bulldozer Price Prediction")
 
@@ -21,29 +21,19 @@ drive_link = st.sidebar.text_input(
 match = re.search(r"/d/([a-zA-Z0-9_-]+)", drive_link)
 if match:
     file_id = match.group(1)
-    csv_url = f"https://drive.google.com/uc?export=download&id={file_id}"
+    csv_path = "TrainAndValid.csv"
+    file_url = f"https://drive.google.com/uc?id={file_id}"
 else:
     st.error("❌ Invalid Google Drive link format.")
     st.stop()
 
-csv_path = "TrainAndValid.csv"
-
 # ---------------------------
-# 2. Download CSV
+# 2. Download CSV via gdown (handles large files)
 # ---------------------------
 if not st.session_state.get("data_loaded"):
     st.write("📥 Downloading dataset from Google Drive...")
-    r = requests.get(csv_url)
-    with open(csv_path, "wb") as f:
-        f.write(r.content)
+    gdown.download(file_url, csv_path, quiet=False)
     st.session_state["data_loaded"] = True
-
-# Check if file is valid
-with open(csv_path, "rb") as f:
-    content_start = f.read(200)
-    if b"<html" in content_start:
-        st.error("❌ The file link is invalid or private. Set it to 'Anyone with link can view' in Google Drive.")
-        st.stop()
 
 st.success("✅ Dataset downloaded successfully!")
 
