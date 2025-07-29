@@ -1,63 +1,54 @@
 import streamlit as st
 import pandas as pd
-import gdown
-import zipfile
-from fastai.tabular.all import load_learner
+import joblib
 
-# ======================
-# CONFIGURATION
-# ======================
-DATA_URL = "https://drive.google.com/uc?id=YOUR_DATASET_FILE_ID"  # Replace with your file ID
-MODEL_URL = "https://drive.google.com/uc?id=YOUR_MODEL_FILE_ID"   # Replace with your model file ID
-
-DATA_ZIP = "TrainAndValid.zip"
-MODEL_FILE = "bulldozer_model.pkl"
-
-# ======================
-# DOWNLOAD AND EXTRACT
-# ======================
+# Load the model and encoder
 @st.cache_resource
-def download_and_prepare_files():
-    # Download dataset if not already present
-    if not st.session_state.get("data_ready", False):
-        st.write("Downloading dataset...")
-        gdown.download(DATA_URL, DATA_ZIP, quiet=False)
-        with zipfile.ZipFile(DATA_ZIP, 'r') as zip_ref:
-            zip_ref.extractall("data")
-        st.session_state["data_ready"] = True
+def load_model():
+    return joblib.load("model.joblib")
 
-    # Download model if not already present
-    if not st.session_state.get("model_ready", False):
-        st.write("Downloading model...")
-        gdown.download(MODEL_URL, MODEL_FILE, quiet=False)
-        st.session_state["model_ready"] = True
+# Load data
+@st.cache_data
+def load_data():
+    return pd.read_csv("TrainAndValid.csv.zip", compression='zip')
 
-    return load_learner(MODEL_FILE)
+# Define the feature columns used in the model
+features = ['YearMade', 'MachineHoursCurrentMeter', 'ModelID', 'ProductGroup', 'Enclosure']
 
-# ======================
-# LOAD MODEL
-# ======================
-model = download_and_prepare_files()
+# Page config
+st.set_page_config(page_title="Bulldozer Price Prediction", layout="wide")
+st.title("🚜 Bulldozer Price Predictor")
+st.markdown("Predict the **sale price** of a bulldozer based on its characteristics.")
 
-# ======================
-# STREAMLIT APP UI
-# ======================
-st.title("🚜 Bulldozer Price Prediction")
+# Load model and data
+model = load_model()
+data = load_data()
 
-st.markdown("Upload details of the bulldozer to predict its selling price.")
+# Filter data for relevant features
+data = data[features + ['SalePrice']].dropna()
 
-year_made = st.number_input("Year Made", min_value=1900, max_value=2025, value=2010)
-sale_month = st.selectbox("Sale Month", list(range(1, 13)))
-sale_year = st.number_input("Sale Year", min_value=2000, max_value=2025, value=2012)
-machine_hours = st.number_input("Machine Hours", min_value=0, value=5000)
+# Sidebar inputs
+st.sidebar.header("Input Bulldozer Features")
+user_input = {
+    'YearMade': st.sidebar.slider('Year Made', int(data['YearMade'].min()), int(data['YearMade'].max()), 2000),
+    'MachineHoursCurrentMeter': st.sidebar.slider('Machine Hours', 0, int(data['MachineHoursCurrentMeter'].max()), 1000),
+    'ModelID': st.sidebar.selectbox('Model ID', sorted(data['ModelID'].unique())),
+    'ProductGroup': st.sidebar.selectbox('Product Group', sorted(data['ProductGroup'].unique())),
+    'Enclosure': st.sidebar.selectbox('Enclosure', sorted(data['Enclosure'].unique())),
+}
 
-if st.button("Predict Price"):
-    input_data = pd.DataFrame([{
-        "YearMade": year_made,
-        "saleMonth": sale_month,
-        "saleYear": sale_year,
-        "MachineHoursCurrentMeter": machine_hours
-    }])
+# Convert input into DataFrame
+input_df = pd.DataFrame([user_input])
 
-    prediction = model.predict(input_data)
-    st.success(f"Estimated Bulldozer Price: ${prediction[0]:,.2f}")
+# Predict button
+if st.button("Predict Sale Price"):
+    # Align columns and dtypes with training data if needed
+    for col in ['ProductGroup', 'Enclosure']:
+        input_df[col] = input_df[col].astype('category')
+
+    prediction = model.predict(input_df)[0]
+    st.subheader(f"💰 Predicted Sale Price: ${prediction:,.2f}")
+
+# Show some raw data if user checks box
+if st.checkbox("Show sample data"):
+    st.write(data.sample(5))
