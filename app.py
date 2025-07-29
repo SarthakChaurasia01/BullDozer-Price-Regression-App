@@ -16,7 +16,7 @@ import os
 
 @st.cache_data
 def load_data():
-    path = "TrainAndValid.csv.zip"
+    path = "TrainAndValid.zip"
     if not os.path.exists(path):
         st.error(f"❌ File not found: {path}")
         return pd.DataFrame()  # return empty df to prevent crash
