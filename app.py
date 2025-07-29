@@ -10,7 +10,7 @@ st.title("🚜 Bulldozer Price Prediction")
 # ---------------------------
 # 1. Download CSV from Google Drive
 # ---------------------------
-csv_url = "https://drive.google.com/file/d/1Id_p4lhVDanRg8y3jMZdLeTlIWDpzS1a/view?usp=sharing"  # Replace with your file ID
+csv_url = "https://drive.google.com/uc?export=download&id=1Id_p4lhVDanRg8y3jMZdLeTlIWDpzS1a"
 csv_path = "TrainAndValid.csv"
 
 if not st.session_state.get("data_loaded"):
@@ -20,12 +20,23 @@ if not st.session_state.get("data_loaded"):
         f.write(r.content)
     st.session_state["data_loaded"] = True
 
-st.success("✅ Dataset ready!")
+# Check if the file is valid
+with open(csv_path, "rb") as f:
+    content_start = f.read(200)
+    if b"<html" in content_start:
+        st.error("❌ The file link is invalid or requires permission. Please fix sharing settings in Google Drive.")
+        st.stop()
+
+st.success("✅ Dataset downloaded!")
 
 # ---------------------------
 # 2. Load Dataset
 # ---------------------------
-df = pd.read_csv(csv_path, low_memory=False)
+try:
+    df = pd.read_csv(csv_path, low_memory=False)
+except pd.errors.ParserError:
+    df = pd.read_csv(csv_path, delimiter=";", low_memory=False)
+
 st.write("### Dataset Preview", df.head())
 
 # ---------------------------
@@ -37,7 +48,6 @@ def train_model(data):
         st.error("Dataset must contain 'SalePrice' column.")
         return None
 
-    # Sample to speed up training if very large
     data = data.sample(50000, random_state=42) if len(data) > 50000 else data
 
     X = data.drop("SalePrice", axis=1).select_dtypes(include=[np.number]).fillna(0)
