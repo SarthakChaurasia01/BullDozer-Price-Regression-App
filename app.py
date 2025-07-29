@@ -1,74 +1,63 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error
+import gdown
+import zipfile
+from fastai.tabular.all import load_learner
 
-st.set_page_config(page_title="🚜 Bulldozer Price Predictor", layout="centered")
-st.title("🚜 Bulldozer Price Prediction App")
-st.write("Enter bulldozer features to predict its auction sale price.")
+# ======================
+# CONFIGURATION
+# ======================
+DATA_URL = "https://drive.google.com/uc?id=YOUR_DATASET_FILE_ID"  # Replace with your file ID
+MODEL_URL = "https://drive.google.com/uc?id=YOUR_MODEL_FILE_ID"   # Replace with your model file ID
 
-# Load dataset
-import streamlit as st
-import pandas as pd
-import os
+DATA_ZIP = "TrainAndValid.zip"
+MODEL_FILE = "bulldozer_model.pkl"
 
-@st.cache_data
-def load_data():
-    path = "TrainAndValid.zip"
-    if not os.path.exists(path):
-        st.error(f"❌ File not found: {path}")
-        return pd.DataFrame()  # return empty df to prevent crash
-    return pd.read_csv(path, compression="zip")
+# ======================
+# DOWNLOAD AND EXTRACT
+# ======================
+@st.cache_resource
+def download_and_prepare_files():
+    # Download dataset if not already present
+    if not st.session_state.get("data_ready", False):
+        st.write("Downloading dataset...")
+        gdown.download(DATA_URL, DATA_ZIP, quiet=False)
+        with zipfile.ZipFile(DATA_ZIP, 'r') as zip_ref:
+            zip_ref.extractall("data")
+        st.session_state["data_ready"] = True
 
-df = load_data()
+    # Download model if not already present
+    if not st.session_state.get("model_ready", False):
+        st.write("Downloading model...")
+        gdown.download(MODEL_URL, MODEL_FILE, quiet=False)
+        st.session_state["model_ready"] = True
 
-if df.empty:
-    st.stop()
+    return load_learner(MODEL_FILE)
 
+# ======================
+# LOAD MODEL
+# ======================
+model = download_and_prepare_files()
 
-# Select features for a simple model
-features = ['YearMade', 'MachineHoursCurrentMeter', 'ProductSize', 'Enclosure']
-data = data[features + ['SalePrice']].dropna()
+# ======================
+# STREAMLIT APP UI
+# ======================
+st.title("🚜 Bulldozer Price Prediction")
 
-# Encode categorical features
-data['ProductSize'] = data['ProductSize'].astype('category').cat.codes
-data['Enclosure'] = data['Enclosure'].astype('category').cat.codes
+st.markdown("Upload details of the bulldozer to predict its selling price.")
 
-X = data[features]
-y = data['SalePrice']
+year_made = st.number_input("Year Made", min_value=1900, max_value=2025, value=2010)
+sale_month = st.selectbox("Sale Month", list(range(1, 13)))
+sale_year = st.number_input("Sale Year", min_value=2000, max_value=2025, value=2012)
+machine_hours = st.number_input("Machine Hours", min_value=0, value=5000)
 
-X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=42)
-model = RandomForestRegressor(n_estimators=100, random_state=42)
-model.fit(X_train, y_train)
+if st.button("Predict Price"):
+    input_data = pd.DataFrame([{
+        "YearMade": year_made,
+        "saleMonth": sale_month,
+        "saleYear": sale_year,
+        "MachineHoursCurrentMeter": machine_hours
+    }])
 
-# Sidebar form
-st.sidebar.header("📝 Input Bulldozer Features")
-with st.sidebar.form("input_form"):
-    year_made = st.slider("Year Made", 1940, 2020, 2000)
-    usage = st.slider("Machine Hours Used", 0, 100000, 5000)
-    product_size = st.selectbox("Product Size", ['Mini', 'Small', 'Medium', 'Large', 'Extra Large', 'Large / Medium'])
-    enclosure = st.selectbox("Enclosure Type", ['None or Unspecified', 'Open', 'EROPS', 'EROPS w AC', 'OROPS'])
-    submitted = st.form_submit_button("Predict Price")
-
-# Encode inputs
-size_map = {'Mini': 0, 'Small': 1, 'Medium': 2, 'Large': 3, 'Extra Large': 4, 'Large / Medium': 5}
-enclosure_map = {'None or Unspecified': 0, 'Open': 1, 'EROPS': 2, 'EROPS w AC': 3, 'OROPS': 4}
-
-if submitted:
-    input_data = pd.DataFrame({
-        'YearMade': [year_made],
-        'MachineHoursCurrentMeter': [usage],
-        'ProductSize': [size_map[product_size]],
-        'Enclosure': [enclosure_map[enclosure]]
-    })
-
-    prediction = model.predict(input_data)[0]
-    st.subheader("💰 Predicted Sale Price")
-    st.success(f"${prediction:,.2f}")
-
-    st.subheader("📉 Model RMSE on Test Set")
-    y_pred_test = model.predict(X_test)
-    rmse = np.sqrt(mean_squared_error(y_test, y_pred_test))
-    st.write(f"RMSE: ${rmse:,.2f}")
+    prediction = model.predict(input_data)
+    st.success(f"Estimated Bulldozer Price: ${prediction[0]:,.2f}")
