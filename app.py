@@ -1,10 +1,10 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import gdown
+import requests
+import re
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
-import re
 
 st.title("🚜 Bulldozer Price Prediction")
 
@@ -17,22 +17,42 @@ drive_link = st.sidebar.text_input(
     value="https://drive.google.com/file/d/1hwVrEAaYGV_aJBMhZ9inV6MX-Am2fM4u/view?usp=drive_link"
 )
 
-# Extract file ID from link
+# Extract file ID
 match = re.search(r"/d/([a-zA-Z0-9_-]+)", drive_link)
 if match:
     file_id = match.group(1)
-    csv_path = "TrainAndValid.csv"
-    file_url = f"https://drive.google.com/uc?id={file_id}"
 else:
     st.error("❌ Invalid Google Drive link format.")
     st.stop()
 
+csv_path = "TrainAndValid.csv"
+
 # ---------------------------
-# 2. Download CSV via gdown (handles large files)
+# 2. Download CSV (Handle Large Files)
 # ---------------------------
+def download_file_from_google_drive(file_id, destination):
+    URL = "https://drive.google.com/uc?export=download"
+
+    session = requests.Session()
+    response = session.get(URL, params={"id": file_id}, stream=True)
+    token = None
+
+    for key, value in response.cookies.items():
+        if key.startswith("download_warning"):
+            token = value
+            break
+
+    if token:
+        response = session.get(URL, params={"id": file_id, "confirm": token}, stream=True)
+
+    with open(destination, "wb") as f:
+        for chunk in response.iter_content(32768):
+            if chunk:
+                f.write(chunk)
+
 if not st.session_state.get("data_loaded"):
     st.write("📥 Downloading dataset from Google Drive...")
-    gdown.download(file_url, csv_path, quiet=False)
+    download_file_from_google_drive(file_id, csv_path)
     st.session_state["data_loaded"] = True
 
 st.success("✅ Dataset downloaded successfully!")
@@ -48,7 +68,7 @@ except pd.errors.ParserError:
 st.write("### Dataset Preview", df.head())
 
 # ---------------------------
-# 4. Train Model (Sample to Speed Up)
+# 4. Train Model
 # ---------------------------
 @st.cache_resource
 def train_model(data):
