@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
+import requests
+import re
 
 st.title("🚜 Bulldozer Price Prediction (Pre-trained Model)")
 
@@ -11,21 +13,42 @@ st.title("🚜 Bulldozer Price Prediction (Pre-trained Model)")
 @st.cache_resource
 def load_model_and_features():
     model = joblib.load("bulldozer_model.pkl")
-    feature_columns = joblib.load("feature_columns.pkl")  # these are final columns after preprocessing
+    feature_columns = joblib.load("feature_columns.pkl")
     return model, feature_columns
 
 model, feature_columns = load_model_and_features()
 
 # ---------------------------
-# 2. Load dataset (for reference)
+# 2. Google Drive CSV Download
 # ---------------------------
-df = pd.read_csv("TrainAndValid.csv", low_memory=False)
+drive_link = st.sidebar.text_input(
+    "Google Drive CSV Link",
+    value="https://drive.google.com/file/d/1hwVrEAaYGV_aJBMhZ9inV6MX-Am2fM4u/view?usp=drive_link"
+)
 
-# Determine which features are categorical (before encoding)
+match = re.search(r"/d/([a-zA-Z0-9_-]+)", drive_link)
+if match:
+    file_id = match.group(1)
+    csv_url = f"https://drive.google.com/uc?export=download&id={file_id}"
+else:
+    st.error("❌ Invalid Google Drive link.")
+    st.stop()
+
+@st.cache_data
+def download_csv(url):
+    return pd.read_csv(url, low_memory=False)
+
+st.write("📥 Loading dataset from Google Drive...")
+df = download_csv(csv_url)
+st.success("✅ Dataset loaded successfully!")
+
+# ---------------------------
+# 3. Identify categorical features
+# ---------------------------
 categorical_features = df.select_dtypes(include=["object"]).columns.tolist()
 
 # ---------------------------
-# 3. Sidebar Inputs
+# 4. Sidebar Inputs
 # ---------------------------
 st.sidebar.header("Enter Bulldozer Details")
 input_data = {}
@@ -38,20 +61,16 @@ numeric_features = [f for f in df.columns if f not in categorical_features and f
 for col in numeric_features:
     input_data[col] = st.sidebar.number_input(col, value=0.0)
 
-# Convert input into DataFrame
 input_df = pd.DataFrame([input_data])
 
 # ---------------------------
-# 4. Preprocessing (Align with Training Features)
+# 5. Preprocess input
 # ---------------------------
-# Convert categorical to one-hot
 input_df = pd.get_dummies(input_df)
-
-# Reindex to match training columns
 input_df = input_df.reindex(columns=feature_columns, fill_value=0)
 
 # ---------------------------
-# 5. Prediction
+# 6. Prediction
 # ---------------------------
 if st.button("Predict Price"):
     prediction = model.predict(input_df)
