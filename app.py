@@ -58,9 +58,19 @@ input_df = pd.DataFrame([input_data])
 input_df = pd.get_dummies(input_df)
 input_df = input_df.reindex(columns=feature_columns, fill_value=0)
 
-# --------------------------------------
-# 6. Prediction
-# --------------------------------------
+# -------------------------------
+# 6. Preprocess input
+# -------------------------------
+input_df = pd.get_dummies(input_df)
+input_df = input_df.reindex(columns=feature_columns, fill_value=0)
+
+# Fill any remaining NaNs
+input_df = input_df.fillna(0)
+
+# -------------------------------
+# 7. Predict Price
+# -------------------------------
 if st.button("Predict Price"):
     prediction = model.predict(input_df)
     st.success(f"💰 Predicted Bulldozer Price: ${prediction[0]:,.2f}")
+
